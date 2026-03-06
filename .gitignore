@@ -1,0 +1,8 @@
+/target
+/*.mov
+/*.mp4
+/*.webm
+/*.html
+/*.png
+/*.sh
+.DS_Store
