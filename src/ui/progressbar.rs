@@ -1,4 +1,4 @@
-use multi_progressbar::{ProgressBar, TaskProgress};
+use crate::patched::multi_progressbar::{ProgressBar, TaskProgress};
 use supercli::prelude::owo::OwoColorize;
 
 pub struct BrailleProgressBar<T: TaskProgress> {

@@ -430,6 +430,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "dsplce-co-multi-progressbar"
+version = "0.1.0-polishes"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fa493435c1913e39f34ba06f943fd7d79b9058ad92ad6e6859edcd5df5eb787c"
+dependencies = [
+ "crossterm",
+]
+
+[[package]]
 name = "dunce"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -699,6 +708,7 @@ dependencies = [
  "chromiumoxide",
  "clap",
  "derive_builder",
+ "dsplce-co-multi-progressbar",
  "enum_variant_type",
  "evt-trait-object",
  "futures",

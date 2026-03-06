@@ -11,7 +11,7 @@ use chromiumoxide::cdp::browser_protocol::page::{
 use chromiumoxide::page::ScreenshotParams;
 use derive_builder::Builder;
 use futures::StreamExt;
-use multi_progressbar::MultiProgressBar;
+use crate::patched::multi_progressbar::MultiProgressBar;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;

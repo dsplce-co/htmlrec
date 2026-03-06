@@ -2,10 +2,16 @@
 name = "htmlrec"
 version = "0.1.0"
 edition = "2021"
+description = "Render HTML animations to video — frame-perfect, headless and deterministic."
+license = "MIT OR Apache-2.0"
 
 [[bin]]
 name = "hrec"
 path = "src/main.rs"
+
+[features]
+default = []
+dev = []
 
 [dependencies]
 chromiumoxide = { version = "0.9.1" }
@@ -21,6 +27,7 @@ strum = { version = "0.28", features = ["derive"] }
 derive_builder = "0.20"
 supercli = { version = "0.1", features = ["clap"] }
 multi-progressbar = "0.1.0"
+dsplce-co-multi-progressbar = { version = "0.1.0-polishes" }
 atty = "0.2"
 unicode-truncate = "2.0"
 

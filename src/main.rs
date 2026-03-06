@@ -4,6 +4,7 @@ mod abstraction;
 mod cli;
 mod commands;
 mod inject;
+mod patched;
 mod ui;
 
 use clap::Parser;

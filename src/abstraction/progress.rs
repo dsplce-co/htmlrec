@@ -1,4 +1,4 @@
-use multi_progressbar::TaskProgress;
+use crate::patched::multi_progressbar::TaskProgress;
 
 use std::sync::{
     atomic::{AtomicU32, Ordering},
