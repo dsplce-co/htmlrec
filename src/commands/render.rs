@@ -12,7 +12,11 @@ impl CliSubcommand for Render {
                 Some("webm" | "mov")
             )
         {
-            bail!("`--transparent` requires a .webm or .mov output file");
+            styled_bail!(
+                "`--transparent` requires a `{}` or `{}` output file",
+                (".webm", "command"),
+                (".mov", "command")
+            );
         }
 
         let renderer = WebRenderer::builder()

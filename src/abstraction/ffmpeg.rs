@@ -1,4 +1,4 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use derive_builder::Builder;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -18,10 +18,14 @@ impl SupportedExts {
         let ext = output
             .extension()
             .and_then(|e| e.to_str())
-            .ok_or_else(|| anyhow::anyhow!("Output file has no extension"))?;
+            .ok_or_else(|| anyhow::anyhow!(styled_error!("Output file has no extension")))?;
 
-        SupportedExts::from_str(ext)
-            .map_err(|_| anyhow::anyhow!("Unsupported output format: .{ext}"))
+        SupportedExts::from_str(ext).map_err(|_| {
+            anyhow::anyhow!(styled_error!(
+                "Unsupported output format: `{}`",
+                (ext, "command")
+            ))
+        })
     }
 
     pub fn ffmpeg_args(&self) -> Vec<&'static str> {
@@ -72,7 +76,7 @@ impl Ffmpeg {
         Command::new("ffmpeg")
             .arg("-version")
             .output()
-            .context("ffmpeg not found — please install ffmpeg")?;
+            .context(styled_error!("ffmpeg not found — please install ffmpeg"))?;
 
         Ok(())
     }
@@ -80,7 +84,7 @@ impl Ffmpeg {
     pub fn run(self) -> Result<()> {
         Ffmpeg::check()?;
 
-        eprintln!("Encoding video...");
+        supercli::info!("Encoding video...");
 
         let fps_str = self.fps.to_string();
 
@@ -98,13 +102,13 @@ impl Ffmpeg {
         let status = Command::new("ffmpeg")
             .args(&cmd_args)
             .status()
-            .context("Failed to run ffmpeg")?;
+            .context(styled_error!("Failed to run ffmpeg"))?;
 
         if !status.success() {
-            bail!("ffmpeg failed");
+            styled_bail!("ffmpeg failed");
         }
 
-        eprintln!("Done! -> {}", self.output.display());
+        supercli::success!(&format!("Done -> {}", self.output.display()));
 
         Ok(())
     }

@@ -1,12 +1,18 @@
+#[macro_use]
+mod colors;
 mod abstraction;
 mod cli;
 mod commands;
 mod inject;
+mod ui;
 
 use clap::Parser;
 use cli::Cli;
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    Cli::parse().command.to_object().run().await
+async fn main() {
+    if let Err(err) = Cli::parse().command.to_object().run().await {
+        supercli::error!(&format!("Error: {}", err));
+        std::process::exit(1);
+    }
 }

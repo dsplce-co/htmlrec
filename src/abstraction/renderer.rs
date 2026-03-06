@@ -1,5 +1,8 @@
+use crate::abstraction::FrameProgress;
 use crate::inject::INJECT;
+use crate::ui::BrailleProgressBar;
 use anyhow::{Context, Result};
+use atty::Stream;
 use chromiumoxide::browser::{Browser, BrowserConfig};
 use chromiumoxide::cdp::browser_protocol::emulation::SetDeviceMetricsOverrideParams;
 use chromiumoxide::cdp::browser_protocol::page::{
@@ -8,7 +11,9 @@ use chromiumoxide::cdp::browser_protocol::page::{
 use chromiumoxide::page::ScreenshotParams;
 use derive_builder::Builder;
 use futures::StreamExt;
+use multi_progressbar::MultiProgressBar;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tempfile::TempDir;
 
@@ -40,31 +45,56 @@ impl WebRenderer {
     ) -> Result<(PathBuf, TempDir)> {
         let total_frames = (duration * self.fps as f64).ceil() as u32;
 
-        eprintln!(
-            "Rendering {} frames at {}fps ({:.1}s) — {} -> {}{}",
-            total_frames,
-            self.fps,
-            duration,
-            input.display(),
-            output.display(),
-            if self.transparent {
-                " [transparent]"
-            } else {
-                ""
-            },
+        supercli::styled!(
+            "Rendering {} frames @{}fps ({}s) — {} -> {}{}",
+            (total_frames.to_string(), "number"),
+            (self.fps.to_string(), "number"),
+            (format!("{:.1}", duration), "number"),
+            (input.display().to_string(), "file_path"),
+            (output.display().to_string(), "file_path"),
+            (
+                if self.transparent {
+                    " [transparent]".to_string()
+                } else {
+                    String::new()
+                },
+                "muted"
+            ),
         );
 
-        let temp_dir = tempfile::tempdir().context("Failed to create temp dir")?;
+        let label = output
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+
+        let progress = FrameProgress::new(total_frames, label);
+        let tasks: Arc<Mutex<Vec<FrameProgress>>> = Arc::new(Mutex::new(vec![progress.clone()]));
+
+        let mp = atty::is(Stream::Stderr).then(|| {
+            Arc::new(MultiProgressBar::new(
+                BrailleProgressBar::<FrameProgress>::new(),
+                Arc::clone(&tasks),
+            ))
+        });
+
+        let temp_dir = tempfile::tempdir().context(styled_error!("Failed to create temp dir"))?;
         let frames_dir = temp_dir.path().to_path_buf();
 
         let (browser, mut handler) = Browser::launch(
             BrowserConfig::builder()
                 .window_size(self.width, self.height)
                 .build()
-                .map_err(|error| anyhow::anyhow!("Browser config error: {error}"))?,
+                .map_err(|error| {
+                    anyhow::anyhow!(styled_error!(
+                        "Browser config error: {}",
+                        (error.to_string(), "muted")
+                    ))
+                })?,
         )
         .await
-        .context("Failed to launch Chrome — is Chromium/Chrome installed?")?;
+        .context(styled_error!(
+            "Failed to launch Chrome — is Chromium/Chrome installed?"
+        ))?;
 
         let _handler = tokio::task::spawn(async move { while handler.next().await.is_some() {} });
 
@@ -77,7 +107,12 @@ impl WebRenderer {
                 .device_scale_factor(1.0)
                 .mobile(false)
                 .build()
-                .map_err(|e| anyhow::anyhow!("Viewport config error: {e}"))?,
+                .map_err(|e| {
+                    anyhow::anyhow!(styled_error!(
+                        "Viewport config error: {}",
+                        (e.to_string(), "muted")
+                    ))
+                })?,
         )
         .await?;
 
@@ -86,7 +121,7 @@ impl WebRenderer {
 
         let abs_path = input
             .canonicalize()
-            .context("Failed to resolve input path")?;
+            .context(styled_error!("Failed to resolve input path"))?;
 
         let url = format!("file://{}", abs_path.display());
 
@@ -102,6 +137,18 @@ impl WebRenderer {
             .await?;
         }
 
+        let mp_draw = mp.clone();
+
+        let draw_handle = tokio::task::spawn(async move {
+            loop {
+                if let Some(ref mp) = mp_draw {
+                    mp.draw().ok();
+                }
+
+                tokio::time::sleep(Duration::from_millis(16)).await;
+            }
+        });
+
         for frame in 0..total_frames {
             let t_ms = frame as f64 / self.fps as f64 * 1000.0;
 
@@ -116,24 +163,28 @@ impl WebRenderer {
                         .build(),
                 )
                 .await
-                .with_context(|| format!("Failed to capture frame {frame}"))?;
+                .with_context(|| {
+                    styled_error!("Failed to capture frame {}", (frame.to_string(), "number"))
+                })?;
 
             std::fs::write(frames_dir.join(format!("frame_{:06}.png", frame)), &data)
-                .with_context(|| format!("Failed to write frame {frame}"))?;
+                .with_context(|| {
+                    styled_error!("Failed to write frame {}", (frame.to_string(), "number"))
+                })?;
 
-            if frame % self.fps == 0 || frame == total_frames - 1 {
-                eprintln!(
-                    "  {}/{} frames ({:.0}%)",
-                    frame + 1,
-                    total_frames,
-                    (frame + 1) as f64 / total_frames as f64 * 100.0
-                );
-            }
+            progress.increment();
+        }
+
+        draw_handle.abort();
+
+        if let Some(ref mp) = mp {
+            mp.draw().ok();
         }
 
         drop(browser);
 
         let pattern = frames_dir.join("frame_%06d.png");
+
         Ok((pattern, temp_dir))
     }
 }

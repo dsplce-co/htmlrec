@@ -20,3 +20,12 @@ tempfile = "3"
 strum = { version = "0.28", features = ["derive"] }
 derive_builder = "0.20"
 supercli = { version = "0.1", features = ["clap"] }
+multi-progressbar = "0.1.0"
+atty = "0.2"
+unicode-truncate = "2.0"
+
+[package.metadata.patch]
+crates = ["multi-progressbar"]
+
+[patch.crates-io.multi-progressbar]
+path = "./target/patch/multi-progressbar-0.1.0"

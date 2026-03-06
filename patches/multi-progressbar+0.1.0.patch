@@ -1,0 +1,216 @@
+diff --git a/src/bar/block.rs b/src/bar/block.rs
+index afbf1c7..dbb4be5 100644
+--- a/src/bar/block.rs
++++ b/src/bar/block.rs
+@@ -1,4 +1,4 @@
+-use crate::{ProgressBar, TaskProgress};
++use crate::{visual_len, ProgressBar, TaskProgress};
+ 
+ /// BlockProgressBar is a progress bar using block characters to show progress.
+ pub struct BlockProgressBar<T: TaskProgress> {
+@@ -50,8 +50,8 @@ where
+             return " ".repeat(width);
+         }
+ 
+-        let before_len = before.as_ref().map(|s| s.len()).unwrap_or(0);
+-        let after_len = after.as_ref().map(|s| s.len()).unwrap_or(0);
++        let before_len = before.as_ref().map(|s| visual_len(s)).unwrap_or(0);
++        let after_len = after.as_ref().map(|s| visual_len(s)).unwrap_or(0);
+ 
+         // check if we have enough space to show progress bar
+         if before_len + after_len + 2 > width {
+diff --git a/src/bar/classic.rs b/src/bar/classic.rs
+index ec31a4e..38c6277 100644
+--- a/src/bar/classic.rs
++++ b/src/bar/classic.rs
+@@ -1,4 +1,4 @@
+-use crate::{ProgressBar, TaskProgress};
++use crate::{visual_len, ProgressBar, TaskProgress};
+ 
+ /// ClassicProgressBar is a classic progress bar, using `[=> ]` to show progress.
+ pub struct ClassicProgressBar<T: TaskProgress> {
+@@ -30,8 +30,8 @@ where
+             return " ".repeat(width);
+         }
+ 
+-        let before_len = before.as_ref().map(|s| s.len()).unwrap_or(0);
+-        let after_len = after.as_ref().map(|s| s.len()).unwrap_or(0);
++        let before_len = before.as_ref().map(|s| visual_len(s)).unwrap_or(0);
++        let after_len = after.as_ref().map(|s| visual_len(s)).unwrap_or(0);
+ 
+         // check if we have enough space to show progress bar
+         if before_len + after_len + 2 > width {
+diff --git a/src/lib.rs b/src/lib.rs
+index 371c6af..e3cff11 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -51,12 +51,44 @@
+ 
+ #![warn(missing_docs)]
+ 
+-use crossterm::{cursor, queue, terminal};
+-use std::io::Write;
++use crossterm::{cursor, queue, style, terminal};
++use std::{
++    io::Write,
++    sync::{
++        atomic::{AtomicUsize, Ordering},
++        Arc, Mutex,
++    },
++};
+ 
+ /// bar module contains premade progress bar styles.
+ pub mod bar;
+ 
++/// Calculates the visual length of a string, excluding ANSI escape sequences.
++/// This is useful for calculating the actual display width of strings that contain
++/// ANSI color codes or other terminal escape sequences.
++pub fn visual_len(s: &str) -> usize {
++    let mut len = 0;
++    let mut chars = s.chars();
++    while let Some(c) = chars.next() {
++        if c == '\x1b' {
++            // Skip ANSI escape sequence
++            // Format is typically ESC [ ... m
++            if chars.as_str().starts_with('[') {
++                chars.next(); // skip '['
++                              // Skip until we find 'm' or reach end
++                while let Some(ch) = chars.next() {
++                    if ch == 'm' {
++                        break;
++                    }
++                }
++            }
++        } else {
++            len += 1;
++        }
++    }
++    len
++}
++
+ /// Task is abstraction for one single running task.
+ pub trait TaskProgress {
+     /// returns the current progress and total progress.
+@@ -83,46 +115,110 @@ pub trait ProgressBar {
+ /// It handles drawing progress bars and log outputs.
+ pub struct MultiProgressBar<P: ProgressBar> {
+     progress_bar: P,
++    tasks: Arc<Mutex<Vec<P::Task>>>,
++    starting_y: AtomicUsize,
+ }
+ 
+ impl<P: ProgressBar> MultiProgressBar<P> {
+     /// creates a new MultiProgress with given ProgressBar style.
+-    pub fn new(progress_bar: P) -> Self {
+-        MultiProgressBar { progress_bar }
++    pub fn new(progress_bar: P, tasks: Arc<Mutex<Vec<P::Task>>>) -> Self {
++        MultiProgressBar {
++            progress_bar,
++            tasks,
++            starting_y: AtomicUsize::new(0),
++        }
++    }
++
++    fn starting_y(&self) -> usize {
++        self.starting_y.load(Ordering::Relaxed)
+     }
+ 
+     /// logs a message above progress bars.
+-    pub fn log(&self, msg: &str, ntasks: usize) -> std::io::Result<()> {
+-        let (width, height) = crossterm::terminal::size().unwrap();
++    pub fn log(&self, msg: &str) -> std::io::Result<()> {
++        let starting_y = self.starting_y();
++
++        if starting_y == 0 {
++            // Not initialized yet, just print normally
++            println!("{}", msg);
++            return Ok(());
++        }
++
++        let (width, _) = crossterm::terminal::size().unwrap();
+         let mut stdout = std::io::stdout();
+ 
+         queue!(
+             stdout,
+-            cursor::MoveToRow(height - ntasks as u16 - 1),
++            cursor::MoveToRow((starting_y - 1) as u16),
+             cursor::MoveToColumn(0),
+-            terminal::ScrollUp(1),
+         )?;
+ 
+-        write!(stdout, "{:width$}", msg, width = width as usize)
++        write!(stdout, "{:width$}", msg, width = width as usize)?;
++        stdout.flush()
+     }
+ 
+     /// draws the progress bars.
+-    pub fn draw(&self, tasks: &[P::Task]) -> std::io::Result<()> {
++    pub fn draw(&self) -> std::io::Result<()> {
++        // Initialize starting_y on first call
++        if self.starting_y() == 0 {
++            let (_, y) = crossterm::cursor::position().unwrap();
++            self.starting_y.store(y as usize + 1, Ordering::Relaxed);
++        }
++
++        let starting_y = self.starting_y();
++        let tasks_no = {
++            let tasks = self.tasks.lock().unwrap();
++            tasks.len()
++        };
++
++        if tasks_no == 0 {
++            return Ok(());
++        }
++
+         let (width, height) = crossterm::terminal::size().unwrap();
+         let mut stdout = std::io::stdout();
++
++        // Ensure we have enough space by printing newlines if needed
++        let max_row = height as usize - 1;
++        let last_row_needed = starting_y + tasks_no - 1;
++
++        if last_row_needed > max_row {
++            // We need more space - print newlines to create it
++            let lines_to_add = last_row_needed - max_row;
++            queue!(
++                stdout,
++                cursor::MoveToRow(max_row as u16),
++                cursor::MoveToColumn(0)
++            )?;
++            for _ in 0..lines_to_add {
++                queue!(stdout, style::Print("\n"))?;
++            }
++            stdout.flush()?;
++
++            // Adjust starting_y since everything scrolled up
++            self.starting_y
++                .store(starting_y - lines_to_add, Ordering::Relaxed);
++        }
++
++        let starting_y = self.starting_y();
++
++        // Draw all progress bars
+         queue!(
+             stdout,
+             terminal::BeginSynchronizedUpdate,
+-            cursor::MoveToColumn(0),
+-            cursor::MoveToRow(height - tasks.len() as u16 - 1),
++            cursor::MoveToRow(starting_y as u16),
++            cursor::MoveToColumn(0)
+         )?;
+ 
+-        for task in tasks {
++        let tasks = self.tasks.lock().unwrap();
++
++        for task in tasks.iter() {
+             let line = self.progress_bar.format_line(task, width as usize);
+-            queue!(stdout, cursor::MoveToColumn(0), cursor::MoveDown(1))?;
+             write!(stdout, "{}", line)?;
++            queue!(stdout, cursor::MoveToColumn(0), cursor::MoveDown(1))?;
+         }
+ 
++        drop(tasks);
++
+         queue!(
+             stdout,
+             terminal::EndSynchronizedUpdate,
