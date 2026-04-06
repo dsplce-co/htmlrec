@@ -1,0 +1,153 @@
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  precheck:
+    runs-on: ubuntu-latest
+
+    outputs:
+      should_continue: ${{ steps.decision.outputs.continue }}
+      local_version: ${{ steps.decision.outputs.version }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - uses: pozetroninc/github-action-get-latest-release@master
+        id: remote
+        with:
+          owner: dsplce-co
+          repo: htmlrec
+          excludes: prerelease, draft
+
+      - name: Crate Version
+        id: local
+        uses: colathro/crate-version@2.0.0
+
+      - run: echo remote ${{ steps.remote.outputs.release }}
+      - run: echo local ${{ steps.local.outputs.version }}
+
+      - id: decision
+        env:
+          LOCAL_VERSION: ${{ steps.local.outputs.version }}
+        run: |
+          if [ "${{ steps.remote.outputs.release }}" = "${{ steps.local.outputs.version }}" ]; then
+            echo "continue=false" >> $GITHUB_OUTPUT
+          else
+            echo "continue=true" >> $GITHUB_OUTPUT
+            echo "version=$LOCAL_VERSION" >> "$GITHUB_OUTPUT"
+          fi
+
+  matrix:
+    runs-on: ubuntu-latest
+    needs: precheck
+    if: ${{ needs.precheck.outputs.should_continue == 'true' }}
+
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+
+    steps:
+      - run: echo ${{ needs.precheck.outputs.local_version }}
+
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Generate build matrix
+        uses: reitermarkus/rust-build-matrix@main
+        id: matrix
+
+  build:
+    runs-on: ${{ matrix.os }}
+    needs: matrix
+    strategy:
+      matrix:
+        include: ${{ fromJSON(needs.matrix.outputs.matrix) }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - uses: cargo-bins/cargo-binstall@main
+      - run: cargo binstall -y patch-crate
+
+      - run: |
+          rustup target add "${target}"
+          cargo patch-crate --force
+          cargo build --release --target "${target}"
+          tar -czf "hrec-${target}.tar.gz" -C "target/${target}/release" hrec
+
+        env:
+          target: ${{ matrix.target }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: "hrec-${{env.target}}.tar.gz"
+          path: "hrec-${{env.target}}.tar.gz"
+          retention-days: 1
+
+        env:
+          target: ${{ matrix.target }}
+
+  pack_deb:
+    runs-on: ubuntu-latest
+    needs: precheck
+    if: ${{ needs.precheck.outputs.should_continue == 'true' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-deb
+        uses: cargo-bins/cargo-binstall@main
+
+      - run: cargo binstall -y cargo-deb
+      - run: cargo binstall -y patch-crate
+      - run: cargo patch-crate --force
+
+      - name: Create Debian package
+        run: cargo deb --target=x86_64-unknown-linux-gnu --output hrec-x86_64-unknown-linux-gnu.deb
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: "hrec-x86_64-unknown-linux-gnu.deb"
+          path: "hrec-x86_64-unknown-linux-gnu.deb"
+          retention-days: 1
+
+  publish:
+    runs-on: ubuntu-latest
+    needs: [build, pack_deb, precheck]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - run: echo ${{ needs.precheck.outputs.local_version }}
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-deb
+        uses: cargo-bins/cargo-binstall@main
+
+      - run: cargo binstall -y patch-crate
+
+      - run: cargo patch-crate --force
+
+      - run: cargo publish -F default --allow-dirty --token "${{env.token}}"
+        env:
+          token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      - name: Release
+        uses: v1olen/version-release-github-action@main
+        env:
+          version: ${{ needs.precheck.outputs.local_version }}
+        with:
+          download-pattern: "hrec-*"
+          release-version: "${{env.version}}"
+          create-latest: "false"
