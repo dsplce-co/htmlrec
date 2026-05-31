@@ -17,6 +17,7 @@ jobs:
 
       - uses: pozetroninc/github-action-get-latest-release@master
         id: remote
+        continue-on-error: true
         with:
           owner: dsplce-co
           repo: htmlrec
@@ -151,3 +152,13 @@ jobs:
           download-pattern: "hrec-*"
           release-version: "${{env.version}}"
           create-latest: "false"
+
+      - name: upgrade-brew-tap
+        uses: v1olen/upgrade-brew-tap@master
+        env:
+          version: ${{ needs.precheck.outputs.local_version }}
+        with:
+          name: "htmlrec"
+          version: "${{env.version}}"
+          tap_repo: "dsplce-co/homebrew-tap"
+          token: ${{ secrets.BREW_TAP_TOKEN }}
