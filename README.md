@@ -157,8 +157,8 @@ hrec render animation.html -o out.mp4 --duration 2
 
 ## 🛠️ Requirements
 
-- **Chromium or Chrome**: A working Chromium/Chrome installation accessible to the system — `htmlrec` launches it headlessly to capture frames
-- **ffmpeg**: Used to encode the captured PNG frames into the output video — must be available on your `PATH`
+- **Chromium or Chrome**: No manual install needed. On first render `hrec` uses any Chrome/Chromium already on your system, and otherwise downloads a headless Chromium automatically and caches it for later runs. On Linux, the downloaded browser may still need common system libraries that a desktop browser normally provides; if any are missing, `hrec` surfaces the browser's own error naming them.
+- **ffmpeg**: Required — used to encode the captured PNG frames into the output video, must be available on your `PATH`
 - **cargo**: For installation from source
 
 ⸻

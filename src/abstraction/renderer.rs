@@ -1,5 +1,7 @@
+use crate::abstraction::chrome::Chrome;
 use crate::abstraction::FrameProgress;
 use crate::inject::INJECT;
+use crate::patched::multi_progressbar::MultiProgressBar;
 use crate::ui::BrailleProgressBar;
 use anyhow::{Context, Result};
 use atty::Stream;
@@ -11,7 +13,6 @@ use chromiumoxide::cdp::browser_protocol::page::{
 use chromiumoxide::page::ScreenshotParams;
 use derive_builder::Builder;
 use futures::StreamExt;
-use crate::patched::multi_progressbar::MultiProgressBar;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -43,6 +44,12 @@ impl WebRenderer {
         output: &Path,
         duration: f64,
     ) -> Result<(PathBuf, TempDir)> {
+        let absolute_path = input
+            .canonicalize()
+            .context(styled_error!("Failed to resolve input path"))?;
+
+        let executable = Chrome::resolve_executable().await?;
+
         let total_frames = (duration * self.fps as f64).ceil() as u32;
 
         supercli::styled!(
@@ -86,26 +93,22 @@ impl WebRenderer {
             .map(|value| !value.is_empty() && value != "0")
             .unwrap_or(false);
 
-        let mut browser_config = BrowserConfig::builder().window_size(self.width, self.height);
+        let mut browser_config_builder = BrowserConfig::builder()
+            .window_size(self.width, self.height)
+            .chrome_executable(executable);
 
         if no_sandbox {
-            browser_config = browser_config.no_sandbox();
+            browser_config_builder = browser_config_builder.no_sandbox();
         }
 
-        let (browser, mut handler) = Browser::launch(
-            browser_config
-                .build()
-                .map_err(|error| {
-                    anyhow::anyhow!(styled_error!(
-                        "Browser config error: {}",
-                        (error.to_string(), "muted")
-                    ))
-                })?,
-        )
-        .await
-        .context(styled_error!(
-            "Failed to launch Chrome — is Chromium/Chrome installed?"
-        ))?;
+        let browser_config = browser_config_builder.build().map_err(|error| {
+            anyhow::anyhow!(styled_error!(
+                "Browser config error: {}",
+                (error.to_string(), "muted")
+            ))
+        })?;
+
+        let (browser, mut handler) = Browser::launch(browser_config).await?;
 
         let _handler = tokio::task::spawn(async move { while handler.next().await.is_some() {} });
 
@@ -130,11 +133,7 @@ impl WebRenderer {
         page.execute(AddScriptToEvaluateOnNewDocumentParams::new(INJECT))
             .await?;
 
-        let abs_path = input
-            .canonicalize()
-            .context(styled_error!("Failed to resolve input path"))?;
-
-        let url = format!("file://{}", abs_path.display());
+        let url = format!("file://{}", absolute_path.display());
 
         page.goto(&url).await?;
 
@@ -142,6 +141,7 @@ impl WebRenderer {
 
         if let Some(zoom) = self.zoom {
             let selector = &self.zoom_element;
+
             page.evaluate(format!(
                 "document.querySelector('{selector}').style.zoom = '{zoom}';"
             ))

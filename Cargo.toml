@@ -14,7 +14,7 @@ default = []
 dev = []
 
 [dependencies]
-chromiumoxide = { version = "0.9.1" }
+chromiumoxide = { version = "0.9.1", features = ["fetcher", "rustls", "zip8"] }
 tokio = { version = "1", features = ["full"] }
 clap = { version = "4", features = ["derive"] }
 anyhow = "1"
@@ -30,6 +30,7 @@ multi-progressbar = "0.1.0"
 dsplce-co-multi-progressbar = { version = "0.1.0-polishes" }
 atty = "0.2"
 unicode-truncate = "2.0"
+dirs = "6"
 
 [package.metadata.patch]
 crates = ["multi-progressbar"]

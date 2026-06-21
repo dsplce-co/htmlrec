@@ -1,3 +1,4 @@
+mod chrome;
 pub mod ffmpeg;
 pub mod progress;
 pub mod renderer;
