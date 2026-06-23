@@ -80,9 +80,20 @@ impl WebRenderer {
         let temp_dir = tempfile::tempdir().context(styled_error!("Failed to create temp dir"))?;
         let frames_dir = temp_dir.path().to_path_buf();
 
+        // Chromium's sandbox can't initialize as root or without user namespaces
+        // (e.g. inside a container); HREC_NO_SANDBOX lets such environments opt out.
+        let no_sandbox = std::env::var("HREC_NO_SANDBOX")
+            .map(|value| !value.is_empty() && value != "0")
+            .unwrap_or(false);
+
+        let mut browser_config = BrowserConfig::builder().window_size(self.width, self.height);
+
+        if no_sandbox {
+            browser_config = browser_config.no_sandbox();
+        }
+
         let (browser, mut handler) = Browser::launch(
-            BrowserConfig::builder()
-                .window_size(self.width, self.height)
+            browser_config
                 .build()
                 .map_err(|error| {
                     anyhow::anyhow!(styled_error!(
