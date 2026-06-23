@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    html, body { margin: 0; height: 100%; }
+    body {
+      display: grid;
+      place-items: center;
+      background: #0b0b0f;
+      overflow: hidden;
+    }
+    .ring {
+      width: 220px;
+      height: 220px;
+      border-radius: 50%;
+      border: 10px solid #1b1b24;
+      border-top-color: #ff0346;
+      border-right-color: #0f80c1;
+      animation: spin 2s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="ring"></div>
+</body>
+</html>
