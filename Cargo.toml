@@ -3,6 +3,7 @@ name = "htmlrec"
 version = "0.2.0"
 edition = "2021"
 description = "Render HTML animations to video — frame-perfect, headless and deterministic."
+exclude = [".github/*", "assets/*", "patches/*", "target/*"]
 license = "MIT OR Apache-2.0"
 
 [[bin]]
