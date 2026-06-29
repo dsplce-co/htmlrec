@@ -60,16 +60,6 @@ After installation, the `hrec` command will be available in your terminal.
 
 `hrec` also needs **ffmpeg** on your `PATH` to encode the video — grab it from your package manager if you haven't already.
 
-### npm
-
-Install globally from npm — the right prebuilt binary for your platform is fetched automatically:
-
-```bash
-npm install -g htmlrec
-```
-
-This installs the `hrec` command. Supported platforms: Linux x64, macOS x64, macOS arm64. See [Requirements](#%EF%B8%8F-requirements) for the ffmpeg and Chrome/Chromium prerequisites.
-
 ### Homebrew
 
 Install from our tap:
@@ -79,6 +69,16 @@ brew install dsplce-co/tap/htmlrec ffmpeg
 ```
 
 This makes the `hrec` command available in your terminal.
+
+### npm
+
+Install globally from npm — the right prebuilt binary for your platform is fetched automatically:
+
+```bash
+npm install -g htmlrec
+```
+
+This installs the `hrec` command. Supported platforms: Linux x64, macOS x64, macOS arm64
 
 ### `.deb` file
 
