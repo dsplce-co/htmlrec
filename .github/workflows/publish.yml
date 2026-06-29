@@ -162,3 +162,31 @@ jobs:
           version: "${{env.version}}"
           tap_repo: "dsplce-co/homebrew-tap"
           token: ${{ secrets.BREW_TAP_TOKEN }}
+
+  publish_npm:
+    runs-on: ubuntu-latest
+    needs: [build, precheck]
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "hrec-*"
+          merge-multiple: true
+          path: artifacts
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Build & publish npm packages
+        run: node npm/build.mjs "${{ needs.precheck.outputs.local_version }}" artifacts
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: true

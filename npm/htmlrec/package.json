@@ -1,0 +1,33 @@
+{
+  "name": "htmlrec",
+  "version": "0.0.0",
+  "description": "Render HTML animations to video — frame-perfect, headless and deterministic.",
+  "bin": {
+    "hrec": "bin/hrec.cjs"
+  },
+  "files": [
+    "bin/hrec.cjs",
+    "README.md"
+  ],
+  "keywords": [
+    "html",
+    "css",
+    "animation",
+    "video",
+    "render",
+    "headless",
+    "chromium",
+    "ffmpeg",
+    "cli"
+  ],
+  "license": "MIT OR Apache-2.0",
+  "homepage": "https://github.com/dsplce-co/htmlrec",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dsplce-co/htmlrec.git"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "optionalDependencies": {}
+}

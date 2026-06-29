@@ -26,6 +26,7 @@
 - [🖤 Features](#-features)
 - [📦 Installation](#-installation)
   - [cargo](#cargo)
+  - [npm](#npm)
 - [🧪 Usage](#-usage)
   - [Render an animation to video](#render-an-animation-to-video)
   - [Render with transparency](#render-with-transparency)
@@ -49,6 +50,16 @@ cargo install htmlrec
 ```
 
 After installation, the `hrec` command will be available in your terminal.
+
+### npm
+
+Install globally from npm — the right prebuilt binary for your platform is fetched automatically:
+
+```bash
+npm install -g htmlrec
+```
+
+This installs the `hrec` command. Supported platforms: Linux x64, macOS x64, macOS arm64. See [Requirements](#%EF%B8%8F-requirements) for the ffmpeg and Chrome/Chromium prerequisites.
 
 ⸻
 
