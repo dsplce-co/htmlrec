@@ -12,6 +12,8 @@
 
 `htmlrec` (`hrec`) is a command-line tool that captures HTML/CSS/JS animations into video files by driving a virtual clock through a headless Chromium instance, frame by frame.
 
+![htmlrec demo](assets/demo.gif)
+
 ## 🖤 Features
 
 - `hrec render anim.html` Got a lovely animation stuck in a browser tab — one Claude one-shotted, or one you hand-rolled — and want it as an actual file? Here's your video, no screen recorder in sight
