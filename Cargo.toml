@@ -1,6 +1,6 @@
 [package]
 name = "htmlrec"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 description = "Render HTML animations to video — frame-perfect, headless and deterministic."
 license = "MIT OR Apache-2.0"
